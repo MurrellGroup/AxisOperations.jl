@@ -1,0 +1,13 @@
+name = "AxisOperations"
+uuid = "e37f04ce-ca06-4a96-b09f-ea39bec02b08"
+authors = ["Anton Oresten <antonoresten@proton.com> and contributors"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
