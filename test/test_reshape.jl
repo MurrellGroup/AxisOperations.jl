@@ -73,7 +73,7 @@
         x = PermutedDimsArray(A, (3, 1, 2))
         @test reshape(x, Keep(3)) == x
         @test reshape(x, Keep(), :) == PermutedDimsArray(reshape(A, :, 4), (2, 1))
-        @test _shares_storage(y, x)
+        @test _shares_storage(A, x)
     end
 end
 
