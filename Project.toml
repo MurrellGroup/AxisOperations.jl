@@ -1,13 +1,15 @@
 name = "AxisOperations"
 uuid = "e37f04ce-ca06-4a96-b09f-ea39bec02b08"
+version = "0.0.1"
 authors = ["Anton Oresten <antonoresten@proton.com> and contributors"]
-version = "1.0.0-DEV"
+
+[workspace]
+projects = ["test"]
+
+[deps]
+EllipsisNotation = "da5c29d0-fa7d-589e-88eb-ea29b0a81949"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
+EllipsisNotation = "1"
 julia = "1.10"
-
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
