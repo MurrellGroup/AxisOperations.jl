@@ -3,11 +3,13 @@
 [![Build Status](https://github.com/MurrellGroup/AxisOperations.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/MurrellGroup/AxisOperations.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/MurrellGroup/AxisOperations.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/MurrellGroup/AxisOperations.jl)
 
-AxisOperations.jl is a library providing an intermediate layer for array axis operations with compile-time awareness of wrappers, and the structure of operations.
+AxisOperations makes lazy wrappers more tractable, and double wrappers less common, by using compile-time type information about the structure of operations to generate custom code at no runtime cost.
+
+The primitives in this package support downstream packages such as [Einops.jl](https://github.com/MurrellGroup/Einops.jl), whose declarative syntax leverages these rewrapping optimizations.
 
 ## Motivation
 
-Julia infamously struggles with "double wrappers", particularly on GPUs, triggering generic scalar indexing fallbacks. This can make users wary when working with lazy wrappers. In the case of `reshape`, the *structure* of the new shape relative to the old shape is completely neglected and an array can for example become a reshape of a view:
+Julia infamously struggles with "double wrappers", particularly on GPUs, triggering generic fallbacks that use scalar indexing. This can make users wary when working with lazy wrappers. In the case of `reshape`, the *structure* of the new shape relative to the old shape is completely neglected and an array can for example become a reshape of a view:
 
 ```julia
 julia> x = rand(3, 4, 2);
@@ -21,36 +23,52 @@ julia> reshape(y, size(y, 1), :) isa Base.ReshapedArray
 true
 ```
 
-We may use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the size of the first dimension. The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), but even then the size alone may not be enough.
+We may use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension. The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), [or if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl), but even then, integers alone are not useful once passed through `reshape`.
 
-AxisOperations.jl provides a way to be explicit about the structure of the reshape operation at compile-time (or code-write-time), enabling optimizations in the form of "rewrapping" the array.
+AxisOperations provides types like `Keep`, `Merge`, and `Split` that encode reshape structure at compile-time, enabling rewrapping optimizations.
 
 ```julia
 julia> using AxisOperations
 
-julia> reshape(y, Keep(1), :) isa SubArray
+julia> reshape(y, Keep(), :) isa SubArray
 true
 ```
 
 As a more complex example, we can "split" the first dimension into two:
 
 ```julia
-julia> x = rand(12, 2);
+julia> x = reshape(collect(1:24), 12, 2);
 
-julia> y = view(x, 1:6, :);
+julia> y = view(x, 1:6, :)
+6×2 view(::Matrix{Int64}, 1:6, :) with eltype Int64:
+ 1  13
+ 2  14
+ 3  15
+ 4  16
+ 5  17
+ 6  18
 
-julia> reshape(y, Split(1, (2, :)), :)
-2×3×2 view(::Array{Float64, 3}, :, 1:3, :) with eltype Float64:
+julia> z = reshape(y, Split(1, (2, :)), :)
+2×3×2 view(::Array{Int64, 3}, :, 1:3, :) with eltype Int64:
 [:, :, 1] =
- 0.509548  0.0287457  0.697172
- 0.442275  0.767883   0.170847
+ 1  3  5
+ 2  4  6
 
 [:, :, 2] =
- 0.717791  0.201782  0.00850527
- 0.265492  0.401664  0.080724
+ 13  15  17
+ 14  16  18
+
+julia> reshape(z, :, Keep()) # undo
+6×2 view(::Matrix{Int64}, 1:6, :) with eltype Int64:
+ 1  13
+ 2  14
+ 3  15
+ 4  16
+ 5  17
+ 6  18
 ```
 
-The view gets unwrapped, the original array gets reshaped, and the viewed first dimension carries over to the second dimension.
+The view is commuted past the reshape: the parent array gets reshaped first, then re-viewed with adjusted indices.
 
 ## Features
 
@@ -59,5 +77,23 @@ The view gets unwrapped, the original array gets reshaped, and the viewed first 
 
 ## Limitations
 
+- Operations won't always rewrap, and may reshape silently if the operation is possible but not without double-wrapping:
+```julia
+julia> reshape(z, Keep(), :)
+2×6 reshape(view(::Array{Int64, 3}, :, 1:3, :), 2, 6) with eltype Int64:
+ 1  3  5  13  15  17
+ 2  4  6  14  16  18
+```
 - Direct arguments of reshape can not be integers when an axis operation is present.
 - `..` and `:` alone won't use AxisOperations.jl, as defining such methods would be type piracy. In these cases, `Keep(..)` and `Merge(..)` should be used instead.
+
+## Installation
+
+```julia
+using Pkg
+Pkg.add("AxisOperations")
+```
+
+## Contributing
+
+At the moment, AxisOperations explicitly defines optimizations in big codegen monoliths for generated function specializations, making the source code hard to parse. Ideally it would use a more modular approach. If you have any ideas or suggestions, please feel free to open an issue or a pull request.
