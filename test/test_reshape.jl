@@ -13,12 +13,12 @@
 
     @testset "Colon notation" begin
         A = reshape(collect(1:24), 4, 3, 2)
-        @test reshape(A, Keep(1), :) == reshape(A, 1, 3, 2)
+        @test reshape(A, Keep(1), :) == reshape(A, 4, :)
     end
 
     @testset "Ellipsis notation" begin
         A = reshape(collect(1:24), 4, 3, 2)
-        @test reshape(A, Split(1, (2, :)), ..) == reshape(A, 2, 3, 2)
+        @test reshape(A, Split(1, (2, :)), ..) == reshape(A, 2, :, 3, 2)
     end
 
     @testset "Resqueeze" begin
