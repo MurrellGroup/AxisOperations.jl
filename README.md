@@ -9,7 +9,7 @@ The primitives in this package support downstream packages such as [Einops.jl](h
 
 ## Motivation
 
-Julia infamously struggles with "double wrappers", particularly on GPUs, triggering generic fallbacks that use scalar indexing. This can make users wary when working with lazy wrappers. In the case of `reshape`, the *structure* of the new shape relative to the old shape is completely neglected and an array can for example become a reshape of a view:
+Julia infamously struggles with "double wrappers", particularly on GPUs, triggering generic fallbacks that use scalar indexing. This can make users particularly wary when working with views and lazy permutations. In the case of `reshape`, the *structure* of the new shape relative to the old shape is completely neglected, and an array may for example become a reshape of a view:
 
 ```julia
 julia> x = rand(3, 4, 2);
@@ -23,7 +23,7 @@ julia> reshape(y, size(y, 1), :) isa Base.ReshapedArray
 true
 ```
 
-We may use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension. The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), [or if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl), but even then, integers alone are not useful once passed through `reshape`.
+We use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension. The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), [or if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl), but even then, integers alone are not useful once passed through `reshape`.
 
 AxisOperations provides types like `Keep`, `Merge`, and `Split` that encode reshape structure at compile-time, enabling rewrapping optimizations.
 
