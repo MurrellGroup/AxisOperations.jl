@@ -5,7 +5,7 @@
 
 Rewrap makes lazy wrappers more tractable, and double wrappers less common, by using compile-time type information about the structure of operations to generate custom code at no runtime cost.
 
-The primitives in this package support downstream packages such as [Einops.jl](https://github.com/MurrellGroup/Einops.jl), whose declarative syntax leverages these rewrapping optimizations.
+The primitives in this package support downstream packages such as [Einops.jl](https://github.com/MurrellGroup/Einops.jl), whose declarative patterns can leverage these rewrapping optimizations.
 
 ## Motivation
 
