@@ -107,6 +107,7 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
 
         elseif opT <: Split
             n_in == 0 && return fallback()
+            sizes_type = opT.parameters[3]
             if n_in == 1 && index_types[pd] <: UnitRange{<:Integer}
                 expected_pd = subdim_to_parent[subdim + 1]
                 drain_integer_dims_to!(expected_pd) || return fallback()
@@ -114,12 +115,14 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                     pd_idx = pd
                     subdim += 1
 
+                    first_is_int = sizes_type.parameters[1] <: Int
+                    first_is_colon = sizes_type.parameters[1] <: Colon
+
                     if m_out == 1
+                        first_is_int || return fallback()
                         push!(parent_ops, :(Keep(1)))
                         push!(view_inds, :(let r = inds[$pd_idx]
-                            sizes = ops[$k].sizes
-                            want = sizes[1]
-                            want isa Int || throw(ArgumentError("Split expects an Int size"))
+                            want = ops[$k].sizes[1]
                             length(r) == want || throw(DimensionMismatch(
                                 string("Split expects a UnitRange of length ", want, ", got length ", length(r))
                             ))
@@ -131,6 +134,27 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
 
                     # m_out >= 2: commute view ∘ Split(1, sizes) to Split(1, (n, sizes[2:end-1]..., :)) ∘ view
                     # with runtime alignment assertions (throws on failure).
+                    # n can come from sizes[1] (Int-first) or be inferred from parent dim (Colon-first).
+                    for j in 2:(m_out - 1)
+                        sizes_type.parameters[j] <: Int || return fallback()
+                    end
+
+                    if first_is_int
+                        n_expr = :(sizes[1])
+                    elseif first_is_colon
+                        sizes_type.parameters[m_out] <: Int || return fallback()
+                        tail_prod_parts = [:(sizes[$j]) for j in 2:m_out]
+                        tail_prod_expr = length(tail_prod_parts) == 1 ? tail_prod_parts[1] : Expr(:call, :*, tail_prod_parts...)
+                        n_expr = :(let tail_prod = $tail_prod_expr, r = inds[$pd_idx]
+                            length(r) % tail_prod == 0 || throw(DimensionMismatch(
+                                string("Split cannot infer first size: range length ", length(r), " not divisible by ", tail_prod)
+                            ))
+                            length(r) ÷ tail_prod
+                        end)
+                    else
+                        return fallback()
+                    end
+
                     tuple_parts = Any[:n]
                     if m_out > 2
                         for j in 2:(m_out - 1)
@@ -140,13 +164,10 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                     push!(tuple_parts, :(:))
                     sizes_tuple_expr = Expr(:tuple, tuple_parts...)
 
-                    push!(parent_ops, :(let sizes = ops[$k].sizes
-                        n = sizes[1]
-                        n isa Int || throw(ArgumentError("Split expects an Int size in first position"))
+                    push!(parent_ops, :(let sizes = ops[$k].sizes, n = $n_expr
                         n > 0 || throw(ArgumentError("Split sizes must be positive; got n=$n"))
                         $(m_out > 2 ? :(for j in 2:$(m_out - 1)
                             sj = sizes[j]
-                            sj isa Int || throw(ArgumentError("Split expects Int sizes in intermediate positions"))
                             sj > 0 || throw(ArgumentError("Split sizes must be positive; got sizes[$j]=$sj"))
                         end) : nothing)
                         Split(1, $sizes_tuple_expr)
@@ -156,10 +177,7 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                         push!(view_inds, :(:))
                     end
 
-                    push!(view_inds, :(let r = inds[$pd_idx]
-                        sizes = ops[$k].sizes
-                        n = sizes[1]
-                        n isa Int || throw(ArgumentError("Split expects an Int size in first position"))
+                    push!(view_inds, :(let r = inds[$pd_idx], sizes = ops[$k].sizes, n = $n_expr
                         n > 0 || throw(ArgumentError("Split sizes must be positive; got n=$n"))
 
                         length(r) % n == 0 || throw(DimensionMismatch(
@@ -179,9 +197,7 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                         middle_prod = 1
                         if $m_out > 2
                             for j in 2:$(m_out - 1)
-                                sj = sizes[j]
-                                sj isa Int || throw(ArgumentError("Split expects Int sizes in intermediate positions"))
-                                middle_prod *= sj
+                                middle_prod *= sizes[j]
                             end
                         end
 
