@@ -63,6 +63,15 @@
         @test y4 == reshape(x4, 2, 1, 2, 2, 2)
         @test y4 isa SubArray
         @test _shares_storage(y4, parent(x4))
+
+        E = reshape(collect(1:32), 8, 2, 2)
+        x5 = view(E, 1:4, :, :)
+        y5_int_first = reshape(x5, Split(1, (2, :)), Keep(..))
+        y5_colon_first = reshape(x5, Split(1, (:, 2)), Keep(..))
+        @test y5_int_first == y5_colon_first
+        @test y5_colon_first == reshape(x5, 2, 2, 2, 2)
+        @test y5_colon_first isa SubArray
+        @test _shares_storage(y5_colon_first, parent(x5))
     end
 
     @testset "PermutedDimsArray reshape wrapper elision" begin
