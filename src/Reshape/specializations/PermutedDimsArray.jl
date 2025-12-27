@@ -11,6 +11,7 @@ function _pda_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVector, pe
     parent_ops = Any[]
 
     in_dim = 0
+    last_parent_start = 0
 
     function push_group!(start::Int, outcount::Int, op_expr)
         push!(starts, start)
@@ -26,21 +27,24 @@ function _pda_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVector, pe
         if opT <: Keep
             for _ in 1:n_in
                 in_dim += 1
-                push_group!(perm[in_dim], 1, :(Keep(1)))
+                last_parent_start = perm[in_dim]
+                push_group!(last_parent_start, 1, :(Keep(1)))
             end
 
         elseif opT <: Merge
             if n_in == 0
-                push_group!(typemax(Int), 1, :(ops[$k]))
+                push_group!(last_parent_start, 1, :(ops[$k]))
             elseif n_in == 1
                 in_dim += 1
-                push_group!(perm[in_dim], 1, :(Keep(1)))
+                last_parent_start = perm[in_dim]
+                push_group!(last_parent_start, 1, :(Keep(1)))
             else
                 first = perm[in_dim + 1]
                 for j in 2:n_in
                     perm[in_dim + j] == first + (j - 1) || return fallback()
                 end
                 in_dim += n_in
+                last_parent_start = first
                 push_group!(first, 1, :(ops[$k]))
             end
 
@@ -51,15 +55,17 @@ function _pda_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVector, pe
                 perm[in_dim + j] == first + (j - 1) || return fallback()
             end
             in_dim += n_in
+            last_parent_start = first
             push_group!(first, m_out, :(ops[$k]))
 
         elseif opT <: Resqueeze
             if n_in == 0
-                push_group!(typemax(Int), m_out, :(ops[$k]))
+                push_group!(last_parent_start, m_out, :(ops[$k]))
             elseif m_out == 0
                 for _ in 1:n_in
                     in_dim += 1
-                    push_group!(perm[in_dim], 0, :(Squeeze(1)))
+                    last_parent_start = perm[in_dim]
+                    push_group!(last_parent_start, 0, :(Squeeze(1)))
                 end
             else
                 return fallback()

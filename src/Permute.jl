@@ -1,4 +1,4 @@
-is_identity_perm(perm::NTuple{N,Int}) where N = perm === ntuple(identity, Val(N))
+is_identity_perm(perm::NTuple{N,Int}) where N = perm == ntuple(identity, N)
 
 """
     Permute(perm::NTuple{N,Int})
