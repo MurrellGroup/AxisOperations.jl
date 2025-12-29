@@ -56,12 +56,12 @@ function _abstractarray_reshape_codegen(op_types::Core.SimpleVector, N::Int)
     shape_tuple = Expr(:tuple, shape_parts...)
 
     if isempty(checks)
-        return :(reshape(x, $shape_tuple))
+        return :(Base.reshape(x, $shape_tuple))
     end
 
     return quote
         $(checks...)
-        reshape(x, $shape_tuple)
+        Base.reshape(x, $shape_tuple)
     end
 end
 
