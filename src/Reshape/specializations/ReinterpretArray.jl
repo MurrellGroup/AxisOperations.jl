@@ -9,7 +9,7 @@ function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
     all(op -> op <: Keep, op_types) && return :x
 
     all_merge = length(op_types) == 1 && op_types[1] <: Merge
-    all_merge && return :(reinterpret($T, reshape(parent(x), Merge(..))))
+    all_merge && return :(reinterpret($T, Base.reshape(parent(x), Merge(..))))
 
     parent_N = check ? N - 1 : N
 
@@ -46,7 +46,7 @@ function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                 ops = r.ops
                 parent_ops = $parent_ops_tuple
                 parent_r = resolve(parent_ops, Val($parent_N))
-                reinterpret(reshape, $T, parent_r(parent(x)))
+                reinterpret(Base.reshape, $T, parent_r(parent(x)))
             end
 
         elseif first_op <: Merge && n_in_first >= 1

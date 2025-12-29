@@ -1,9 +1,17 @@
 # API
 
-## `Reshape`
+## Enhanced Base
 
 ```@docs
-Reshape
+Base.reshape
+Rewrap.reshape
+Rewrap.dropdims
+Rewrap.vec
+```
+
+## `LocalReshape`
+
+```@docs
 Keep
 Merge
 Split
@@ -13,27 +21,11 @@ Squeeze
 Unsqueeze
 ```
 
-## `Permute`
+## Global Axis Operations
 
 ```@docs
+Reshape
 Permute
-```
-
-## `Reduce`
-
-```@docs
 Reduce
-```
-
-## `Repeat`
-
-```@docs
 Repeat
-```
-
-## Enhanced Base
-
-```@docs
-Rewrap.dropdims
-Rewrap.vec
 ```

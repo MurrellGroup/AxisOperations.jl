@@ -1,5 +1,29 @@
 @testset "Enhanced Base" begin
 
+    @testset "Rewrap.reshape" begin
+        A = reshape(collect(1:24), 4, 3, 2)
+
+        @test Rewrap.reshape(A, :) == vec(A)
+        @test Rewrap.reshape(A, ..) == A
+        @test Rewrap.reshape(A, Keep(), :) == reshape(A, 4, 6)
+        @test Rewrap.reshape(A, :, Keep()) == reshape(A, 12, 2)
+
+        x = view(reshape(collect(1:30), 6, 5), :, 1:4)
+        y = Rewrap.reshape(x, :)
+        @test y == vec(collect(x))
+        @test y isa SubArray
+        @test _shares_storage(y, parent(x))
+
+        x2 = view(reshape(collect(1:24), 4, 3, 2), 1:2, :, :)
+        y2 = Rewrap.reshape(x2, Split(1, (1, 2)), ..)
+        @test y2 == reshape(x2, 1, 2, 3, 2)
+        @test _shares_storage(y2, parent(x2))
+
+        @test_throws ArgumentError Rewrap.reshape(A, :, :)
+        @test_throws ArgumentError Rewrap.reshape(A, .., ..)
+        @test_throws ArgumentError Rewrap.reshape(A, :, ..)
+    end
+
     @testset "dropdims" begin
         A = reshape(collect(1:24), 4, 1, 3, 1, 2)
 
