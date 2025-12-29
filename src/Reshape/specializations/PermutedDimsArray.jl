@@ -106,7 +106,7 @@ function _pda_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVector, pe
     return quote
         ops = r.ops
         parent_ops = $(Expr(:tuple, parent_ops_sorted...))
-        parent_r = resolve(parent_ops, Val($N))
+        parent_r = Reshape(parent_ops, Val($N))
         rp = parent_r(parent(x))
         PermutedDimsArray(rp, $new_perm_tuple)
     end

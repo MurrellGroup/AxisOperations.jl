@@ -45,7 +45,7 @@ function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
             return quote
                 ops = r.ops
                 parent_ops = $parent_ops_tuple
-                parent_r = resolve(parent_ops, Val($parent_N))
+                parent_r = Reshape(parent_ops, Val($parent_N))
                 reinterpret(Base.reshape, $T, parent_r(parent(x)))
             end
 
@@ -56,7 +56,7 @@ function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
             return quote
                 ops = r.ops
                 parent_ops = $parent_ops_tuple
-                parent_r = resolve(parent_ops, Val($parent_N))
+                parent_r = Reshape(parent_ops, Val($parent_N))
                 reinterpret($T, parent_r(parent(x)))
             end
         else
@@ -72,7 +72,7 @@ function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
             return quote
                 ops = r.ops
                 parent_ops = $parent_ops_tuple
-                parent_r = resolve(parent_ops, Val($parent_N))
+                parent_r = Reshape(parent_ops, Val($parent_N))
                 reinterpret($T, parent_r(parent(x)))
             end
 
@@ -91,7 +91,7 @@ function _reinterp_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
                 first_size = ops[1].sizes[1]
                 if first_size % $ratio == 0
                     parent_ops = $parent_ops_tuple
-                    parent_r = resolve(parent_ops, Val($parent_N))
+                    parent_r = Reshape(parent_ops, Val($parent_N))
                     reinterpret($T, parent_r(parent(x)))
                 else
                     invoke(r, Tuple{AbstractArray{$T,$N}}, x)

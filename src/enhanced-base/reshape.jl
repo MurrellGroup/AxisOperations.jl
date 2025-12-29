@@ -36,7 +36,7 @@ function reshape end
 Rewrap.reshape(x::AbstractArray, args...) = Base.reshape(x, args...)
 
 @constprop function Rewrap.reshape(x::AbstractArray, ops::Tuple{LocalReshape,Vararg{LocalReshape}})
-    r = resolve(ops, Val(ndims(x)))
+    r = Reshape(ops, Val(ndims(x)))
     r(x)
 end
 

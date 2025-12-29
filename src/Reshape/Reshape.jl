@@ -1,11 +1,20 @@
 include("LocalReshape.jl")
 include("utils.jl")
 
+"""
+    Reshape(ops, ::Val{N})
+    Reshape(ops, ::AbstractArray{<:Any,N})
+
+Given a tuple of operations and the input array dimensionality,
+construct a `Reshape` object that can be used to reshape arrays.
+
+See also [`Rewrap.reshape`](@ref) and [`Base.reshape`](@ref).
+"""
 struct Reshape{OpsT,N,M} <: GlobalAxisOp{N,M}
     ops::OpsT
 end
 
-@generated function resolve(ops::OpsT, ::Val{N}) where {OpsT<:Tuple,N}
+@generated function Reshape(ops::OpsT, ::Val{N}) where {OpsT<:Tuple,N}
     op_types = OpsT.parameters
     _ops_has_ellipsis(op_types) || nothing
 
@@ -81,7 +90,7 @@ end
     return :(Reshape{$resolved_opsT,$N,$produced}($resolved_ops_expr))
 end
 
-resolve(ops, ::AbstractArray{<:Any,N}) where {N} = resolve(ops, Val(N))
+Reshape(ops, ::AbstractArray{<:Any,N}) where {N} = Reshape(ops, Val(N))
 
 include("specializations/AbstractArray.jl")
 include("specializations/PermutedDimsArray.jl")

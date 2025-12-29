@@ -286,7 +286,7 @@ function _subarray_reshape_codegen(T, N::Int, M::Int, op_types::Core.SimpleVecto
         ops = r.ops
         inds = parentindices(x)
         parent_ops = $parent_ops_tuple
-        parent_r = resolve(parent_ops, Val($Nparent))
+        parent_r = Reshape(parent_ops, Val($Nparent))
         rp = parent_r(parent(x))
         view(rp, $view_inds_tuple...)
     end
