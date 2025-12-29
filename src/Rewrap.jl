@@ -30,6 +30,7 @@ macro constprop(ex, setting::Symbol=:aggressive)
 end
 
 include("Reshape/Reshape.jl")
+export Reshape
 export Keep
 export Merge
 export Split, Split1
