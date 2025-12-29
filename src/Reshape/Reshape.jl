@@ -86,6 +86,7 @@ resolve(ops, ::AbstractArray{<:Any,N}) where {N} = resolve(ops, Val(N))
 include("specializations/AbstractArray.jl")
 include("specializations/PermutedDimsArray.jl")
 include("specializations/SubArray.jl")
+include("specializations/ReinterpretArray.jl")
 
 """
     reshape(x, ops::Union{LocalReshape,Colon,EllipsisNotation.Ellipsis}...)
