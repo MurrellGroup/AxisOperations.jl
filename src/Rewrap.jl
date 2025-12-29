@@ -35,6 +35,8 @@ export Merge
 export Split, Split1
 export Resqueeze, Squeeze, Unsqueeze
 
+include("enhanced-base")
+
 include("Permute.jl")
 export Permute
 
