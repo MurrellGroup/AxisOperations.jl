@@ -3,6 +3,9 @@
 
 Drop the specified dimensions from the array `x`.
 
+!!! note
+    This method may not be type stable if `dims` cannot be constant-propagated.
+
 ```jldoctest
 julia> x = [1 3 5; 2 4 6;;;]
 2×3×1 Array{Int64, 3}:
@@ -27,5 +30,5 @@ julia> Rewrap.dropdims(y; dims=3)
 ) where N
     dims′ = dims isa Int ? (dims,) : dims
     ops = ntuple(i -> i in dims′ ? Squeeze() : Keep(), N)
-    return reshape(x, ops)
+    return Rewrap.reshape(x, ops)
 end

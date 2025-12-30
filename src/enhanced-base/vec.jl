@@ -23,4 +23,4 @@ julia> Rewrap.vec(view(x, 1:2, :)) # not contiguous!
  6
 ```
 """
-vec(x) = reshape(x, Merge(..))
+vec(x) = Rewrap.reshape(x, :)

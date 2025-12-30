@@ -1,11 +1,13 @@
-const AnyOp = Union{LocalReshape,ColonOrEllipsis}
+const AnyOp = Union{LocalReshape,Int,Colon,Ellipsis}
 
 """
     Rewrap.reshape(x, ops...)
     Rewrap.reshape(x, ops::Tuple)
 
 Reshape the array `x` using the given operations, which can include
-`:` (Base.Colon) and `..` (EllipsisNotation.Ellipsis).
+`:` (Base.Colon), `..` (EllipsisNotation.Ellipsis), and integers.
+
+Integers and colons can form a single contiguous sequence that becomes a `Split(.., sizes)`.
 
 See also [`Base.reshape`](@ref).
 
@@ -35,23 +37,9 @@ function reshape end
 
 Rewrap.reshape(x::AbstractArray, args...) = Base.reshape(x, args...)
 
-@constprop function Rewrap.reshape(x::AbstractArray, ops::Tuple{LocalReshape,Vararg{LocalReshape}})
+@constprop function Rewrap.reshape(x::AbstractArray, ops::Tuple{AnyOp,Vararg{AnyOp}})
     r = Reshape(ops, Val(ndims(x)))
     r(x)
-end
-
-@constprop function Rewrap.reshape(x::AbstractArray, ops::Tuple{AnyOp,Vararg{AnyOp}})
-    count(op -> op isa ColonOrEllipsis, ops) > 1 && throw(ArgumentError("At most one Colon or Ellipsis is allowed"))
-    ops′ = map(ops) do op
-        if op isa Colon
-            Merge(..)
-        elseif op isa Ellipsis
-            Keep(..)
-        else
-            op
-        end
-    end
-    return Rewrap.reshape(x, ops′)
 end
 
 @constprop function Rewrap.reshape(x::AbstractArray, op1::AnyOp, ops::AnyOp...)
@@ -60,13 +48,15 @@ end
 
 ## Base.reshape
 
+const NonLocalOp = Union{Int,Colon,Ellipsis}
+
 """
     Base.reshape(x, ops...)
     Base.reshape(x, ops::Tuple)
 
 Reshape the array `x` using the given operations, which can include
-`:` (Base.Colon) and `..` (EllipsisNotation.Ellipsis), but there
-must be at least one `LocalReshape`.
+`:` (Base.Colon), `..` (EllipsisNotation.Ellipsis), and integers,
+but there must be at least one `LocalReshape`.
 
 See also [`Rewrap.reshape`](@ref).
 
@@ -94,30 +84,47 @@ julia> reshape(view(rand(2, 3), :, 1:2), Merge(..)) |> summary # can not use a s
 """
 Base.reshape
 
-@constprop function Base.reshape(x::AbstractArray, ops::Tuple{LocalReshape,Vararg{LocalReshape}})
-    return Rewrap.reshape(x, ops)
-end
-
 @constprop function Base.reshape(
     x::AbstractArray,
     ops::Union{
-        Tuple{ColonOrEllipsis,LocalReshape,Vararg{LocalReshape}},
-        Tuple{LocalReshape,Vararg{AnyOp}}
+        Tuple{LocalReshape,Vararg{AnyOp}},
+        Tuple{NonLocalOp,LocalReshape,Vararg{AnyOp}},
+        Tuple{NonLocalOp,NonLocalOp,LocalReshape,Vararg{AnyOp}},
+        Tuple{NonLocalOp,NonLocalOp,NonLocalOp,LocalReshape,Vararg{AnyOp}},
+        Tuple{NonLocalOp,NonLocalOp,NonLocalOp,NonLocalOp,LocalReshape,Vararg{AnyOp}}
     }
 )
     return Rewrap.reshape(x, ops)
 end
 
 @constprop function Base.reshape(
-    x::AbstractArray, op1::LocalReshape, ops::Union{LocalReshape,ColonOrEllipsis}...
+    x::AbstractArray, op1::LocalReshape, ops::AnyOp...
 )
     return Rewrap.reshape(x, (op1, ops...))
 end
 
 @constprop function Base.reshape(
-    x::AbstractArray, op1::ColonOrEllipsis, op2::LocalReshape, ops::LocalReshape...
+    x::AbstractArray, op1::NonLocalOp, op2::LocalReshape, ops::AnyOp...
 )
     return Rewrap.reshape(x, (op1, op2, ops...))
+end
+
+@constprop function Base.reshape(
+    x::AbstractArray, op1::NonLocalOp, op2::NonLocalOp, op3::LocalReshape, ops::AnyOp...
+)
+    return Rewrap.reshape(x, (op1, op2, op3, ops...))
+end
+
+@constprop function Base.reshape(
+    x::AbstractArray, op1::NonLocalOp, op2::NonLocalOp, op3::NonLocalOp, op4::LocalReshape, ops::AnyOp...
+)
+    return Rewrap.reshape(x, (op1, op2, op3, op4, ops...))
+end
+
+@constprop function Base.reshape(
+    x::AbstractArray, op1::NonLocalOp, op2::NonLocalOp, op3::NonLocalOp, op4::NonLocalOp, op5::LocalReshape, ops::AnyOp...
+)
+    return Rewrap.reshape(x, (op1, op2, op3, op4, op5, ops...))
 end
 
 
