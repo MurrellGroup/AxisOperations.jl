@@ -50,9 +50,10 @@ Merge(N::IntOrEllipsis) = Merge{N}()
 """
     Split(N, sizes)
     Split{N}(sizes...)
+    Split(sizes...)
     Split(sizes)
 
-Split the first `N` dimensions into `M` dimensions, with sizes given by a tuple
+Split the first `N` (1, if not provided) dimensions into `M` dimensions, with sizes given by a tuple
 of integers and at most one colon (`:`).
 This can be interpreted as a local reshape operation on the `N` dimensions,
 and doesn't have many of the compile time guarantees of the other operations.
@@ -81,6 +82,8 @@ Split(N::IntOrEllipsis, sizes::T) where {M,T<:NTuple{M,IntOrColon}} =
     Split{N,M,T}(sizes)
 
 Split{N}(sizes::IntOrColon...) where N = Split(N, sizes)
+
+Split(sizes::IntOrColon...) = Split(1, sizes)
 
 Split(sizes::Tuple{Vararg{IntOrColon}}) = Split(1, sizes)
 

@@ -104,16 +104,14 @@ end
     return Expr(:call, :*, (Expr(:call, :size, xsym, in_dim + j) for j in 1:n_in)...)
 end
 
-function _ops_has_ellipsis(op_types::Tuple)
+function _ops_has_ellipsis(op_types)
     for op in op_types
         (is_ellipsis(ndims_in(op)) || is_ellipsis(ndims_out(op))) && return true
     end
     return false
 end
 
-_ops_has_ellipsis(op_types::Core.SimpleVector) = _ops_has_ellipsis(Tuple(op_types))
-
-function _ops_total_in(op_types::Tuple)
+function _ops_total_in(op_types)
     total = 0
     for op in op_types
         n = ndims_in(op)
@@ -123,4 +121,57 @@ function _ops_total_in(op_types::Tuple)
     return total
 end
 
-_ops_total_in(op_types::Core.SimpleVector) = _ops_total_in(Tuple(op_types))
+function _is_intcolon(T::Type)
+    T <: Int && return true
+    T <: Colon && return true
+    return false
+end
+
+function _preprocess_op_types(op_types)
+    n = length(op_types)
+    n == 0 && return op_types, nothing
+    
+    runs = Tuple{Int,Int}[]
+    i = 1
+    while i <= n
+        if _is_intcolon(op_types[i])
+            start = i
+            while i <= n && _is_intcolon(op_types[i])
+                i += 1
+            end
+            push!(runs, (start, i - 1))
+        else
+            i += 1
+        end
+    end
+    
+    has_ellipsis = any(T -> is_ellipsis(T), op_types)
+    
+    isempty(runs) && return op_types, nothing
+    
+    if length(runs) == 1 && runs[1][1] == runs[1][2] && op_types[runs[1][1]] <: Colon
+        has_ellipsis && throw(ArgumentError("At most one Colon or Ellipsis is allowed"))
+        return op_types, :lone_colon => runs[1][1]
+    end
+    
+    length(runs) == 1 || throw(ArgumentError("Int/Colon must form a single contiguous sequence"))
+    has_ellipsis && throw(ArgumentError("Cannot mix Ellipsis (..) with Int/Colon sequence"))
+    
+    start, stop = runs[1]
+    colon_count = count(i -> op_types[i] <: Colon, start:stop)
+    colon_count <= 1 || throw(ArgumentError("Split can have at most one Colon in sizes"))
+
+    return op_types, :split_sequence => runs[1]
+end
+
+function _build_split_type(op_types, start::Int, stop::Int)
+    M = stop - start + 1
+    size_types = Any[op_types[i] for i in start:stop]
+    T = Tuple{size_types...}
+    return Split{.., M, T}
+end
+
+function _build_split_expr(start::Int, stop::Int)
+    sizes_expr = Expr(:tuple, [:(ops[$i]) for i in start:stop]...)
+    return :(Split(.., $sizes_expr))
+end

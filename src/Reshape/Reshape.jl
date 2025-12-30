@@ -15,7 +15,57 @@ struct Reshape{OpsT,N,M} <: GlobalAxisOp{N,M}
 end
 
 @generated function Reshape(ops::OpsT, ::Val{N}) where {OpsT<:Tuple,N}
-    op_types = OpsT.parameters
+    raw_op_types = OpsT.parameters
+    _, preprocess_result = _preprocess_op_types(raw_op_types)
+    
+    op_types = Any[]
+    op_exprs = Any[]
+    
+    if preprocess_result === nothing
+        for (k, opT) in enumerate(raw_op_types)
+            if is_ellipsis(opT)
+                push!(op_types, Keep{..})
+                push!(op_exprs, :(Keep(..)))
+            else
+                push!(op_types, opT)
+                push!(op_exprs, :(ops[$k]))
+            end
+        end
+    elseif preprocess_result.first === :lone_colon
+        idx = preprocess_result.second
+        for (k, opT) in enumerate(raw_op_types)
+            if k == idx
+                push!(op_types, Merge{..})
+                push!(op_exprs, :(Merge(..)))
+            elseif is_ellipsis(opT)
+                push!(op_types, Keep{..})
+                push!(op_exprs, :(Keep(..)))
+            else
+                push!(op_types, opT)
+                push!(op_exprs, :(ops[$k]))
+            end
+        end
+    else
+        (start, stop) = preprocess_result.second
+        split_type = _build_split_type(raw_op_types, start, stop)
+        split_expr = _build_split_expr(start, stop)
+        
+        for (k, opT) in enumerate(raw_op_types)
+            if k == start
+                push!(op_types, split_type)
+                push!(op_exprs, split_expr)
+            elseif k > start && k <= stop
+                continue
+            elseif is_ellipsis(opT)
+                push!(op_types, Keep{..})
+                push!(op_exprs, :(Keep(..)))
+            else
+                push!(op_types, opT)
+                push!(op_exprs, :(ops[$k]))
+            end
+        end
+    end
+    
     _ops_has_ellipsis(op_types) || nothing
 
     ellipsis_seen = false
@@ -70,7 +120,7 @@ end
             T0 = opT.parameters[3]
             M0 = opT.parameters[2]
             mout == M0 || throw(ArgumentError("Split output rank cannot be ellipsis-resolved"))
-            push!(resolved_op_exprs, :(Split($nin, ops[$k].sizes)))
+            push!(resolved_op_exprs, :(Split($nin, $(op_exprs[k]).sizes)))
             push!(resolved_op_types, Split{nin, M0, T0})
 
         elseif opT <: Resqueeze
