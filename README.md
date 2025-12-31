@@ -11,7 +11,7 @@ The primitives in this package support downstream packages such as [Einops.jl](h
 
 ## Motivation
 
-Julia infamously struggles with "double wrappers", particularly on GPUs, triggering generic fallbacks that use scalar indexing. This can make users particularly wary when working with views and lazy permutations. In the case of `reshape`, the *structure* of the new shape relative to the old shape is completely neglected, and an array may for example become a reshape of a view:
+Julia infamously struggles with "double wrappers", particularly on GPUs, triggering generic fallbacks that use scalar indexing. This can make users wary when working with views and lazy permutations. In the case of `reshape`, the *structure* of the new shape relative to the old shape is completely neglected, and an array may for example become a reshape of a view:
 
 ```julia
 julia> x = rand(3, 4, 2);
@@ -25,7 +25,9 @@ julia> reshape(y, size(y, 1), :) isa Base.ReshapedArray
 true
 ```
 
-We use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension. The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), [or if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl), but even then, integers alone are not useful once passed through `reshape`.
+We use `size(y, 1)` in our reshape, but despite preserving the first dimension (the one dimension only partially sliced) it evaluates to an integer at runtime, and Julia has no way of knowing that it represents preserving the first dimension.
+
+The size could in theory be constant-propagated [if the size wasn't dynamic](https://github.com/JuliaArrays/FixedSizeArrays.jl), or [if the size is embedded in the type](https://github.com/JuliaArrays/StaticArrays.jl). But even then, integers alone are not useful once passed through `reshape`.
 
 Rewrap provides types like `Keep`, `Merge`, and `Split` that encode reshape structure at compile-time, enabling rewrapping optimizations.
 
@@ -74,8 +76,38 @@ The view is commuted past the reshape: the parent array gets reshaped first, the
 
 ## Features
 
-- `..` (from [EllipsisNotation.jl](https://github.com/SciML/EllipsisNotation.jl)) is replaced with `Keep(..)` when passed to `reshape`.
-- `:` can be used like normal, but under the hood it gets replaced by `Merge(..)` when passed to `reshape`.
+### Local Reshape Operations
+
+These operations are passed to `reshape` and consume/emit a specific number of dimensions:
+
+| Operation | Description |
+|-----------|-------------|
+| `Keep(N)` | Keep `N` dimensions unchanged (default: 1). `..` becomes `Keep(..)`. |
+| `Merge(N)` | Merge `N` dimensions into one. `:` becomes `Merge(..)`. |
+| `Split(N, sizes)` | Split `N` dimensions into multiple, with sizes as a tuple of integers and at most one `:`. |
+| `Squeeze(N)` | Remove `N` singleton dimensions (default: 1). |
+| `Unsqueeze(M)` | Add `M` singleton dimensions (default: 1). |
+| `Resqueeze(N => M)` | Turn `N` singleton dimensions into `M` singleton dimensions. |
+
+### Global Axis Operations
+
+These are callable structs that transform arrays:
+
+| Operation | Description |
+|-----------|-------------|
+| `Reshape(ops, x)` | Apply a tuple of local reshape operations to array `x`. |
+| `Permute(perm)` | Permute axes, unwrapping existing `PermutedDimsArray` when possible. |
+| `Reduce(f; dims)` | Reduce over dimensions, unwrapping lazy permutes when only reduced dims were permuted. |
+| `Repeat(repeats)` | Repeat array along dimensions, pushing through `PermutedDimsArray` to avoid scalar indexing. |
+
+### Enhanced Base Functions
+
+Rewrap also provides optimized versions of common operations:
+
+- `Rewrap.reshape(x, ops...)` — reshape with full Rewrap semantics (no type piracy concerns)
+- `Base.reshape(x, ops...)` — reshape with Rewrap semantics (must include a `LocalReshape`)
+- `Rewrap.dropdims(x; dims)` — drop singleton dimensions while preserving wrapper types
+- `Rewrap.vec(x)` — flatten to vector, preserving views when possible
 
 ## Limitations
 
@@ -86,7 +118,6 @@ julia> reshape(z, Keep(), :)
  1  3  5  13  15  17
  2  4  6  14  16  18
 ```
-- Direct arguments of reshape can not be integers when an axis operation is present.
 - `..` and `:` alone won't use Rewrap.jl, as defining such methods would be type piracy. In these cases, `Keep(..)` and `Merge(..)` should be used instead.
 
 ## Installation
@@ -98,4 +129,4 @@ Pkg.add("Rewrap")
 
 ## Contributing
 
-At the moment, Rewrap explicitly defines optimizations in big codegen monoliths for generated function specializations, making the source code hard to parse. Ideally it would use a more modular approach. If you have any ideas or suggestions, please feel free to open an issue or a pull request.
+Rewrap uses generated functions with compile-time type analysis to produce specialized code for each reshape pattern. We welcome ideas for making the implementation more modular — please feel free to open an issue or pull request.
